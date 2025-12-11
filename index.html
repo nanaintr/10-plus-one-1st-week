@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>광명 경륜 10+1차 쿠폰 조회</title>
+
+  <!-- TailwindCSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- PapaParse (CSV 파싱용) -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body class="bg-slate-100 min-h-screen">
+  <div class="max-w-3xl mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">
+      광명 경륜 10+1차 쿠폰 당첨 조회
+    </h1>
+    <p class="text-sm text-slate-600 mb-6">
+      휴대전화 번호 <span class="font-semibold">마지막 4자리</span>를 입력하면 쿠폰 당첨 여부를 확인할 수 있습니다.<br>
+      예: 번호가 <span class="font-mono">010-1234-<span class="underline">5678</span></span> 이라면 <span class="font-mono">5678</span> 입력
+    </p>
+
+    <!-- 검색 폼 -->
+    <form id="search-form" class="flex flex-col sm:flex-row gap-3 items-start sm:items-center mb-4">
+      <div class="flex items-center gap-2">
+        <label for="last4" class="text-sm font-medium text-slate-700 whitespace-nowrap">
+          휴대폰 끝 4자리
+        </label>
+        <input
+          id="last4"
+          type="text"
+          inputmode="numeric"
+          maxlength="4"
+          class="w-28 px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-center"
+          placeholder="1234"
+        />
+      </div>
+      <button
+        type="submit"
+        class="px-4 py-2 bg-blue-600 text-white rounded-md shadow hover:bg-blue-700 transition text-sm font-medium"
+      >
+        조회하기
+      </button>
+    </form>
+
+    <!-- 상태 메시지 -->
+    <div id="status" class="text-sm text-slate-600 mb-3">
+      데이터 불러오는 중입니다…
+    </div>
+
+    <!-- 결과 영역 -->
+    <div id="results-container" class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden hidden">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="px-4 py-2 text-left font-semibold text-slate-700">이름</th>
+            <th class="px-4 py-2 text-left font-semibold text-slate-700">휴대폰번호</th>
+            <th class="px-4 py-2 text-right font-semibold text-slate-700">쿠폰금액</th>
+          </tr>
+        </thead>
+        <tbody id="results-body" class="divide-y divide-slate-100">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // 🔗 구글 시트 "웹에 게시" → CSV 형식 주소로 바꿔 넣기
+    // 예: https://docs.google.com/spreadsheets/d/1QVseb_kf96bXRAsjSCUKY4-FFbskUTHZAWI60K9yI1k/pub?output=csv
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTcabHB4nh1SOD6U4adGjJ97PXhE6N2Lk8Zn2znqTImDyPnN2QNC3FPez7eOeWYu_nMS9_OSKOImlLE/pub?output=csv";
+
+    // 시트 헤더 이름 (실제 시트 헤더와 맞춰주세요)
+    const NAME_KEYS = ["이름", "이름(개인정보보호)"];
+    const PHONE_KEYS = ["휴대폰번호", "휴대폰번호(개인정보보호)"];
+    const COUPON_KEYS = ["쿠폰금액", "쿠폰 금액"];
+
+    let rows = [];
+    let isLoaded = false;
+
+    const statusEl = document.getElementById("status");
+    const resultsContainer = document.getElementById("results-container");
+    const resultsBody = document.getElementById("results-body");
+    const form = document.getElementById("search-form");
+    const last4Input = document.getElementById("last4");
+
+    // 유틸: 가능한 키 중 실제로 존재하는 컬럼을 찾기
+    function getField(row, keys) {
+      for (const k of keys) {
+        if (k in row) return row[k];
+      }
+      return "";
+    }
+
+    // CSV 불러오기
+    function loadData() {
+      Papa.parse(CSV_URL, {
+        download: true,
+        header: true,
+        encoding: "UTF-8",
+        complete: function (results) {
+          rows = results.data.filter(r => Object.keys(r).length > 0);
+          isLoaded = true;
+          statusEl.textContent = "데이터가 준비되었습니다. 휴대폰 끝 4자리를 입력해 조회해주세요.";
+        },
+        error: function (err) {
+          console.error(err);
+          statusEl.textContent = "데이터를 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+        }
+      });
+    }
+
+    // 검색 처리
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      const last4 = last4Input.value.trim();
+
+      if (!isLoaded) {
+        statusEl.textContent = "아직 데이터가 로딩 중입니다. 잠시만 기다려주세요.";
+        return;
+      }
+
+      if (!/^\d{4}$/.test(last4)) {
+        statusEl.textContent = "휴대폰 번호 끝 4자리를 숫자 4자리로 입력해주세요. (예: 5678)";
+        resultsContainer.classList.add("hidden");
+        resultsBody.innerHTML = "";
+        return;
+      }
+
+      // 끝 4자리로 필터
+      const matches = rows.filter(row => {
+        const phoneRaw = (getField(row, PHONE_KEYS) || "").toString().replace(/\s+/g, "");
+        return phoneRaw.endsWith(last4);
+      });
+
+      if (matches.length === 0) {
+        statusEl.textContent =
+          "죄송합니다.😢 입력하신 번호와 일치하는 쿠폰 당첨 내역이 없습니다. 12월 19일~21일에 다시 도전해주세요.";
+        resultsContainer.classList.add("hidden");
+        resultsBody.innerHTML = "";
+        return;
+      }
+
+      // 결과 테이블 렌더
+      resultsBody.innerHTML = "";
+      matches.forEach(row => {
+        const name = getField(row, NAME_KEYS) || "";
+        const phone = getField(row, PHONE_KEYS) || "";
+        const coupon = getField(row, COUPON_KEYS) || "";
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="px-4 py-2 text-slate-800">${name}</td>
+          <td class="px-4 py-2 font-mono text-slate-700">${phone}</td>
+          <td class="px-4 py-2 text-right text-slate-800 font-semibold">${coupon}</td>
+        `;
+        resultsBody.appendChild(tr);
+      });
+
+      statusEl.innerHTML =
+        "축하드려요! 🥳👏 아래에서 당첨 결과를 확인해주세요.<br>총 " +
+        matches.length +
+        "건의 당첨 내역이 있습니다.";
+      resultsContainer.classList.remove("hidden");
+    });
+
+    // 페이지 로드 시 데이터 로딩
+    window.addEventListener("DOMContentLoaded", loadData);
+  </script>
+</body>
+</html>
