@@ -6,7 +6,7 @@
   <title>🚴광명 경륜 10+1 1만원 드림 프로모션 2차 쿠폰 당첨 조회🚴</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <!-- ✅ PapaParse 제거: JSON을 fetch로 불러오므로 필요 없음 -->
 </head>
 
 <body class="bg-slate-100 min-h-screen">
@@ -60,13 +60,14 @@
   </div>
 
   <script>
-    // ✅ 구글 시트 "웹에 게시" CSV URL
-    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTcabHB4nh1SOD6U4adGjJ97PXhE6N2Lk8Zn2znqTImDyPnN2QNC3FPez7eOeWYu_nMS9_OSKOImlLE/pub?output=csv";
+    // ✅ Vercel public 폴더에 올린 JSON (이미 확인 완료!)
+    // https://10-plus-one-1st-week.vercel.app/2nd_week_winners.json
+    const JSON_URL = "/2nd_week_winners.json";
 
-    // ✅ 시트 헤더(컬럼명) 후보들
-    const NAME_KEYS = ["이름", "이름(개인정보보호)"];
-    const PHONE_KEYS = ["휴대폰번호", "휴대폰번호(개인정보보호)"];
-    const COUPON_KEYS = ["쿠폰금액", "쿠폰 금액"];
+    // ✅ 컬럼명(네 JSON 실제 컬럼)
+    const NAME_KEY  = "이름(개인정보보호)";
+    const PHONE_KEY = "휴대폰번호(개인정보보호)";
+    const COUPON_KEY = "쿠폰금액";
 
     let rows = [];
     let isLoaded = false;
@@ -77,46 +78,33 @@
     const form = document.getElementById("search-form");
     const mid4Input = document.getElementById("mid4");
 
-    // ✅ 유틸: row에서 가능한 키들 중 실제 존재하는 값을 꺼내기
-    function getField(row, keys) {
-      for (const k of keys) {
-        if (k in row) return row[k];
-      }
-      return "";
-    }
-
     // ✅ 유틸: 전화번호에서 숫자만 추출
     function onlyDigits(s) {
-      return (s || "").toString().replace(/\D/g, ""); // 숫자 이외 제거
+      return (s || "").toString().replace(/\D/g, "");
     }
 
-    // ✅ 유틸: "가운데 4자리" 추출 (한국 휴대폰 11자리 기준)
+    // ✅ 유틸: 가운데 4자리 추출
     function getMiddle4(phoneRaw) {
       const d = onlyDigits(phoneRaw);
-      // 010xxxxxxxx 형태(11자리)면 가운데 4자리는 4~7번째(0-index 3~6)
-      if (d.length === 11) return d.slice(3, 7);
-      // 혹시 10자리 등 예외가 있으면 안전하게 처리(가운데 4 비슷하게)
-      if (d.length >= 7) return d.slice(3, 7);
+      if (d.length === 11) return d.slice(3, 7); // 010xxxxxxxx
+      if (d.length >= 7) return d.slice(3, 7);   // 예외 안전장치
       return "";
     }
 
-    // ✅ CSV 로딩
-    function loadData() {
+    // ✅ JSON 로딩
+    async function loadData() {
       statusEl.textContent = "데이터 불러오는 중입니다…";
-
-      Papa.parse(CSV_URL, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          rows = results.data || [];
-          isLoaded = true;
-          statusEl.textContent = `데이터 로드 완료! (총 ${rows.length}건) 가운데 4자리를 입력해 조회하세요.`;
-        },
-        error: () => {
-          statusEl.textContent = "데이터를 불러오지 못했습니다. (시트 공개/CSV URL 확인 필요)";
-        }
-      });
+      try {
+        // cache: "no-store" → 갱신 반영을 빠르게
+        const res = await fetch(JSON_URL + "?t=" + Date.now(), { cache: "no-store" });
+        if (!res.ok) throw new Error("JSON fetch failed: " + res.status);
+        rows = await res.json();
+        isLoaded = true;
+        statusEl.textContent = `데이터 로드 완료! (총 ${rows.length}건) 가운데 4자리를 입력해 조회하세요.`;
+      } catch (e) {
+        console.error(e);
+        statusEl.textContent = "데이터를 불러오지 못했습니다. (JSON 파일/경로 확인 필요)";
+      }
     }
 
     // ✅ 검색 처리
@@ -139,10 +127,7 @@
       }
 
       // ✅ 가운데 4자리로 매칭
-      const matches = rows.filter(row => {
-        const phone = getField(row, PHONE_KEYS);
-        return getMiddle4(phone) === mid4;
-      });
+      const matches = rows.filter(row => getMiddle4(row[PHONE_KEY]) === mid4);
 
       if (matches.length === 0) {
         statusEl.textContent =
@@ -155,9 +140,9 @@
       // 결과 렌더
       resultsBody.innerHTML = "";
       matches.forEach(row => {
-        const name = getField(row, NAME_KEYS) || "";
-        const phone = getField(row, PHONE_KEYS) || "";
-        const coupon = getField(row, COUPON_KEYS) || "";
+        const name = row[NAME_KEY] || "";
+        const phone = row[PHONE_KEY] || "";
+        const coupon = row[COUPON_KEY] || "";
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
