@@ -1,1 +1,167 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>🚴광명 경륜 10+1 1만원 드림 프로모션 2차 쿠폰 당첨 조회🚴</title>
 
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- ✅ PapaParse 제거: JSON을 fetch로 불러오므로 필요 없음 -->
+</head>
+
+<body class="bg-slate-100 min-h-screen">
+  <div class="max-w-3xl mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold text-slate-800 mb-2">
+      🚴광명 경륜 10+1 1만원 드림 프로모션 2차 쿠폰 당첨 조회🚴
+    </h1>
+    <p class="text-sm text-slate-600 mb-6">
+      휴대전화 번호 <span class="font-semibold">가운데 4자리</span>를 입력하면 쿠폰 당첨 여부를 확인할 수 있습니다.<br>
+      예: 번호가 <span class="font-mono">010-<span class="underline">1234</span>-5678</span> 이라면 <span class="font-mono">1234</span> 입력
+    </p>
+
+    <form id="search-form" class="flex flex-col sm:flex-row gap-3 items-start sm:items-center mb-4">
+      <div class="flex items-center gap-2">
+        <label for="mid4" class="text-sm font-medium text-slate-700 whitespace-nowrap">
+          휴대폰 가운데 4자리
+        </label>
+        <input
+          id="mid4"
+          type="text"
+          inputmode="numeric"
+          maxlength="4"
+          class="w-28 px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-center"
+          placeholder="1234"
+        />
+      </div>
+      <button
+        type="submit"
+        class="px-4 py-2 bg-blue-600 text-white rounded-md shadow hover:bg-blue-700 transition text-sm font-medium"
+      >
+        조회하기
+      </button>
+    </form>
+
+    <div id="status" class="text-sm text-slate-600 mb-3">
+      데이터 불러오는 중입니다…
+    </div>
+
+    <div id="results-container" class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden hidden">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="px-4 py-2 text-left font-semibold text-slate-700">이름</th>
+            <th class="px-4 py-2 text-left font-semibold text-slate-700">휴대폰번호</th>
+            <th class="px-4 py-2 text-right font-semibold text-slate-700">쿠폰금액</th>
+          </tr>
+        </thead>
+        <tbody id="results-body" class="divide-y divide-slate-100"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // ✅ Vercel public 폴더에 올린 JSON (이미 확인 완료!)
+    // https://10-plus-one-1st-week.vercel.app/2nd_week_winners.json
+    const JSON_URL = "./2nd_week_winners.json";
+
+    // ✅ 컬럼명(네 JSON 실제 컬럼)
+    const NAME_KEY  = "이름(개인정보보호)";
+    const PHONE_KEY = "휴대폰번호(개인정보보호)";
+    const COUPON_KEY = "쿠폰금액";
+
+    let rows = [];
+    let isLoaded = false;
+
+    const statusEl = document.getElementById("status");
+    const resultsContainer = document.getElementById("results-container");
+    const resultsBody = document.getElementById("results-body");
+    const form = document.getElementById("search-form");
+    const mid4Input = document.getElementById("mid4");
+
+    // ✅ 유틸: 전화번호에서 숫자만 추출
+    function onlyDigits(s) {
+      return (s || "").toString().replace(/\D/g, "");
+    }
+
+    // ✅ 유틸: 가운데 4자리 추출
+    function getMiddle4(phoneRaw) {
+      const d = onlyDigits(phoneRaw);
+      if (d.length === 11) return d.slice(3, 7); // 010xxxxxxxx
+      if (d.length >= 7) return d.slice(3, 7);   // 예외 안전장치
+      return "";
+    }
+
+    // ✅ JSON 로딩
+    async function loadData() {
+      statusEl.textContent = "데이터 불러오는 중입니다…";
+      try {
+        // cache: "no-store" → 갱신 반영을 빠르게
+        const res = await fetch(JSON_URL + "?t=" + Date.now(), { cache: "no-store" });
+        if (!res.ok) throw new Error("JSON fetch failed: " + res.status);
+        rows = await res.json();
+        isLoaded = true;
+        statusEl.textContent = `데이터 로드 완료! (총 ${rows.length}건) 가운데 4자리를 입력해 조회하세요.`;
+      } catch (e) {
+        console.error(e);
+        statusEl.textContent = "데이터를 불러오지 못했습니다. (JSON 파일/경로 확인 필요)";
+      }
+    }
+
+    // ✅ 검색 처리
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      if (!isLoaded) {
+        statusEl.textContent = "아직 데이터 로딩 중입니다. 잠시 후 다시 시도해주세요.";
+        return;
+      }
+
+      const mid4 = (mid4Input.value || "").trim();
+
+      // 입력값 검증(숫자 4자리)
+      if (!/^\d{4}$/.test(mid4)) {
+        statusEl.textContent = '휴대전화 가운데 4자리를 숫자 4자리로 입력해주세요. (예: 1234)';
+        resultsContainer.classList.add("hidden");
+        resultsBody.innerHTML = "";
+        return;
+      }
+
+      // ✅ 가운데 4자리로 매칭
+      const matches = rows.filter(row => getMiddle4(row[PHONE_KEY]) === mid4);
+
+      if (matches.length === 0) {
+        statusEl.textContent =
+          "죄송합니다.😢 입력하신 번호와 일치하는 쿠폰 당첨 내역이 없습니다. 다음 기회에 다시 도전해주세요.";
+        resultsContainer.classList.add("hidden");
+        resultsBody.innerHTML = "";
+        return;
+      }
+
+      // 결과 렌더
+      resultsBody.innerHTML = "";
+      matches.forEach(row => {
+        const name = row[NAME_KEY] || "";
+        const phone = row[PHONE_KEY] || "";
+        const coupon = row[COUPON_KEY] || "";
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="px-4 py-2 text-slate-800">${name}</td>
+          <td class="px-4 py-2 font-mono text-slate-700">${phone}</td>
+          <td class="px-4 py-2 text-right text-slate-800 font-semibold">${coupon}</td>
+        `;
+        resultsBody.appendChild(tr);
+      });
+
+      statusEl.innerHTML =
+        "축하드려요! 🥳👏 아래에서 당첨 결과를 확인해주세요.<br>총 " +
+        matches.length +
+        "건의 당첨 내역이 있습니다.";
+
+      resultsContainer.classList.remove("hidden");
+    });
+
+    window.addEventListener("DOMContentLoaded", loadData);
+  </script>
+</body>
+</html>
